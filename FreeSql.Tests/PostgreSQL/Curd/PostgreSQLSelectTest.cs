@@ -121,7 +121,8 @@ namespace FreeSql.Tests.PostgreSQL {
 		}
 		class TestDto {
 			public int id { get; set; }
-			public string name { get; set; }
+			public string name { get; set; } //这是join表的属性
+			public int ParentId { get; set; } //这是join表的属性
 		}
 		[Fact]
 		public void ToList() {
@@ -130,6 +131,11 @@ namespace FreeSql.Tests.PostgreSQL {
 			var testDto2 = select.Limit(10).ToList(a => new TestDto());
 			var testDto3 = select.Limit(10).ToList(a => new TestDto { });
 			var testDto4 = select.Limit(10).ToList(a => new TestDto() { });
+
+			var testDto11 = select.LeftJoin(a => a.Type.Guid == a.TypeGuid).Limit(10).ToList(a => new TestDto { id = a.Id, name = a.Title });
+			var testDto22 = select.LeftJoin(a => a.Type.Guid == a.TypeGuid).Limit(10).ToList(a => new TestDto());
+			var testDto33 = select.LeftJoin(a => a.Type.Guid == a.TypeGuid).Limit(10).ToList(a => new TestDto { });
+			var testDto44 = select.LeftJoin(a => a.Type.Guid == a.TypeGuid).Limit(10).ToList(a => new TestDto() { });
 
 
 			var t1 = g.pgsql.Select<TestInfo>().Where("").Where(a => a.Id > 0).Skip(100).Limit(200).ToSql();
@@ -209,9 +215,19 @@ namespace FreeSql.Tests.PostgreSQL {
 			var t1111 = g.pgsql.Select<TestInfo>().ToList(a => new { a.Id, a.Title, a.Type });
 
 			var t2222 = g.pgsql.Select<TestInfo>().ToList(a => new { a.Id, a.Title, a.Type.Name });
+
+			g.pgsql.Insert<TestGuidIdToList>().AppendData(new TestGuidIdToList()).ExecuteAffrows();
+			var testGuidId5 = g.pgsql.Select<TestGuidIdToList>().ToList();
+			var testGuidId6 = g.pgsql.Select<TestGuidIdToList>().ToList(a => a.id);
+		}
+		class TestGuidIdToList {
+			public Guid id { get; set; }
+			public string title { get; set; } = Guid.NewGuid().ToString();
 		}
 		[Fact]
 		public void ToOne() {
+			var testnotfind = select.Where("1=2").First(a => a.CreateTime);
+			Assert.Equal(default(DateTime), testnotfind);
 		}
 		[Fact]
 		public void ToSql() {
@@ -261,14 +277,21 @@ namespace FreeSql.Tests.PostgreSQL {
 		}
 		[Fact]
 		public void From() {
-			//�������
-			var query2 = select.From<TestTypeInfo, TestTypeParentInfo>((s, b, c) => s
+
+			var query2 = select.From<TestTypeInfo>((s, b) => s
+				 .LeftJoin(a => a.TypeGuid == b.Guid)
+				);
+			var sql2 = query2.ToSql().Replace("\r\n", "");
+			Assert.Equal("SELECT a.\"id\", a.\"clicks\", a.\"typeguid\", b.\"guid\", b.\"parentid\", b.\"name\", a.\"title\", a.\"createtime\" FROM \"tb_topic\" a LEFT JOIN \"testtypeinfo\" b ON a.\"typeguid\" = b.\"guid\"", sql2);
+			query2.ToList();
+
+			var query3 = select.From<TestTypeInfo, TestTypeParentInfo>((s, b, c) => s
 				 .LeftJoin(a => a.TypeGuid == b.Guid)
 				 .LeftJoin(a => b.ParentId == c.Id)
 				);
-			var sql = query2.ToSql().Replace("\r\n", "");
-			Assert.Equal("SELECT a.\"id\", a.\"clicks\", a.\"typeguid\", b.\"guid\", b.\"parentid\", b.\"name\", a.\"title\", a.\"createtime\" FROM \"tb_topic\" a LEFT JOIN \"testtypeinfo\" b ON a.\"typeguid\" = b.\"guid\" LEFT JOIN \"testtypeparentinfo\" c ON b.\"parentid\" = c.\"id\"", sql);
-			query2.ToList();
+			var sql3 = query3.ToSql().Replace("\r\n", "");
+			Assert.Equal("SELECT a.\"id\", a.\"clicks\", a.\"typeguid\", b.\"guid\", b.\"parentid\", b.\"name\", a.\"title\", a.\"createtime\" FROM \"tb_topic\" a LEFT JOIN \"testtypeinfo\" b ON a.\"typeguid\" = b.\"guid\" LEFT JOIN \"testtypeparentinfo\" c ON b.\"parentid\" = c.\"id\"", sql3);
+			query3.ToList();
 		}
 		[Fact]
 		public void LeftJoin() {
@@ -693,6 +716,12 @@ namespace FreeSql.Tests.PostgreSQL {
 			var sql33 = select.OrderBy(a => new Random().NextDouble()).Page(3, 10).ToList();
 		}
 		[Fact]
+		public void Distinct() {
+			var t1 = select.Distinct().ToList(a => a.Title);
+			var t2 = select.Distinct().Limit(10).ToList(a => a.Title);
+		}
+
+		[Fact]
 		public void Sum() {
 		}
 		[Fact]
@@ -710,6 +739,9 @@ namespace FreeSql.Tests.PostgreSQL {
 
 		[Fact]
 		public void AsTable() {
+
+			var listt = select.AsTable((a, b) => "(select * from tb_topic where clicks > 10)").Page(1, 10).ToList();
+
 			Func<Type, string, string> tableRule = (type, oldname) => {
 				if (type == typeof(Topic)) return oldname + "AsTable1";
 				else if (type == typeof(TestTypeInfo)) return oldname + "AsTable2";

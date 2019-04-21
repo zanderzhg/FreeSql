@@ -13,6 +13,12 @@ namespace FreeSql {
 		/// <param name="transaction"></param>
 		/// <returns></returns>
 		IUpdate<T1> WithTransaction(DbTransaction transaction);
+		/// <summary>
+		/// 指定事务对象
+		/// </summary>
+		/// <param name="transaction"></param>
+		/// <returns></returns>
+		IUpdate<T1> WithConnection(DbConnection connection);
 
 		/// <summary>
 		/// 不使用参数化，可通过 IFreeSql.CodeFirst.IsNotCommandParameter 全局性设置
@@ -44,6 +50,19 @@ namespace FreeSql {
 		/// <param name="columns"></param>
 		/// <returns></returns>
 		IUpdate<T1> IgnoreColumns(string[] columns);
+
+		/// <summary>
+		/// 指定的列，UpdateColumns(a => a.Name) | UpdateColumns(a => new{a.Name,a.Time}) | UpdateColumns(a => new[]{"name","time"})
+		/// </summary>
+		/// <param name="columns">lambda选择列</param>
+		/// <returns></returns>
+		IUpdate<T1> UpdateColumns(Expression<Func<T1, object>> columns);
+		/// <summary>
+		/// 指定的列
+		/// </summary>
+		/// <param name="columns"></param>
+		/// <returns></returns>
+		IUpdate<T1> UpdateColumns(string[] columns);
 
 		/// <summary>
 		/// 设置列的新值，Set(a => a.Name, "newvalue")
@@ -101,6 +120,12 @@ namespace FreeSql {
 		/// <param name="notExists">不存在</param>
 		/// <returns></returns>
 		IUpdate<T1> WhereExists<TEntity2>(ISelect<TEntity2> select, bool notExists = false) where TEntity2 : class;
+		/// <summary>
+		/// 传入动态对象如：主键值 | new[]{主键值1,主键值2} | TEntity1 | new[]{TEntity1,TEntity2} | new{id=1}
+		/// </summary>
+		/// <param name="dywhere">主键值、主键值集合、实体、实体集合、匿名对象、匿名对象集合</param>
+		/// <returns></returns>
+		IUpdate<T1> WhereDynamic(object dywhere);
 
 		/// <summary>
 		/// 设置表名规则，可用于分库/分表，参数1：默认表名；返回值：新表名；
@@ -108,6 +133,12 @@ namespace FreeSql {
 		/// <param name="dataTable"></param>
 		/// <returns></returns>
 		IUpdate<T1> AsTable(Func<string, string> tableRule);
+		/// <summary>
+		/// 动态Type，在使用 Update&lt;object&gt; 后使用本方法，指定实体类型
+		/// </summary>
+		/// <param name="entityType"></param>
+		/// <returns></returns>
+		IUpdate<T1> AsType(Type entityType);
 		/// <summary>
 		/// 返回即将执行的SQL语句
 		/// </summary>

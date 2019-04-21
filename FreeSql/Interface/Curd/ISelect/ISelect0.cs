@@ -15,6 +15,12 @@ namespace FreeSql {
 		/// <param name="transaction"></param>
 		/// <returns></returns>
 		TSelect WithTransaction(DbTransaction transaction);
+		/// <summary>
+		/// 指定连接对象
+		/// </summary>
+		/// <param name="connection"></param>
+		/// <returns></returns>
+		TSelect WithConnection(DbConnection connection);
 
 		/// <summary>
 		/// 审核或跟踪 ToList 即将返回的数据
@@ -64,6 +70,12 @@ namespace FreeSql {
 		/// <param name="dataTable"></param>
 		/// <returns></returns>
 		TSelect AsTable(Func<Type, string, string> tableRule);
+		/// <summary>
+		/// 动态Type，在使用 Select&lt;object&gt; 后使用本方法，指定实体类型
+		/// </summary>
+		/// <param name="entityType"></param>
+		/// <returns></returns>
+		TSelect AsType(Type entityType);
 		/// <summary>
 		/// 返回即将执行的SQL语句
 		/// </summary>
@@ -236,5 +248,11 @@ namespace FreeSql {
 		/// <param name="pageSize">每页多少</param>
 		/// <returns></returns>
 		TSelect Page(int pageIndex, int pageSize);
+
+		/// <summary>
+		/// 查询数据前，去重
+		/// </summary>
+		/// <returns></returns>
+		TSelect Distinct();
 	}
 }

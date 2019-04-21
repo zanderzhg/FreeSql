@@ -20,6 +20,7 @@ namespace FreeSql.Internal.CommonProvider {
 		protected int _whereTimes = 0;
 		protected List<DbParameter> _params = new List<DbParameter>();
 		protected DbTransaction _transaction;
+		protected DbConnection _connection;
 
 		public DeleteProvider(IFreeSql orm, CommonUtils commonUtils, CommonExpression commonExpression, object dywhere) {
 			_orm = orm;
@@ -27,7 +28,7 @@ namespace FreeSql.Internal.CommonProvider {
 			_commonExpression = commonExpression;
 			_table = _commonUtils.GetTableByEntity(typeof(T1));
 			this.Where(_commonUtils.WhereObject(_table, "", dywhere));
-			if (_orm.CodeFirst.IsAutoSyncStructure) _orm.CodeFirst.SyncStructure<T1>();
+			if (_orm.CodeFirst.IsAutoSyncStructure && typeof(T1) != typeof(object)) _orm.CodeFirst.SyncStructure<T1>();
 		}
 
 		protected void ClearData() {
@@ -37,23 +38,28 @@ namespace FreeSql.Internal.CommonProvider {
 			_params.Clear();
 		}
 
-
 		public IDelete<T1> WithTransaction(DbTransaction transaction) {
 			_transaction = transaction;
+			_connection = _transaction?.Connection;
+			return this;
+		}
+		public IDelete<T1> WithConnection(DbConnection connection) {
+			if (_transaction?.Connection != connection) _transaction = null;
+			_connection = connection;
 			return this;
 		}
 
 		public int ExecuteAffrows() {
 			var sql = this.ToSql();
 			if (string.IsNullOrEmpty(sql)) return 0;
-			var affrows = _orm.Ado.ExecuteNonQuery(_transaction, CommandType.Text, sql, _params.ToArray());
+			var affrows = _orm.Ado.ExecuteNonQuery(_connection, _transaction, CommandType.Text, sql, _params.ToArray());
 			this.ClearData();
 			return affrows;
 		}
 		async public Task<int> ExecuteAffrowsAsync() {
 			var sql = this.ToSql();
 			if (string.IsNullOrEmpty(sql)) return 0;
-			var affrows = await _orm.Ado.ExecuteNonQueryAsync(_transaction, CommandType.Text, sql, _params.ToArray());
+			var affrows = await _orm.Ado.ExecuteNonQueryAsync(_connection, _transaction, CommandType.Text, sql, _params.ToArray());
 			this.ClearData();
 			return affrows;
 		}
@@ -75,11 +81,21 @@ namespace FreeSql.Internal.CommonProvider {
 		public IDelete<T1> Where(T1 item) => this.Where(new[] { item });
 		public IDelete<T1> Where(IEnumerable<T1> items) => this.Where(_commonUtils.WhereItems(_table, "", items));
 		public IDelete<T1> WhereExists<TEntity2>(ISelect<TEntity2> select, bool notExists = false) where TEntity2 : class => this.Where($"{(notExists ? "NOT " : "")}EXISTS({select.ToSql("1")})");
+		public IDelete<T1> WhereDynamic(object dywhere) => this.Where(_commonUtils.WhereObject(_table, "", dywhere));
 
 		public IDelete<T1> AsTable(Func<string, string> tableRule) {
 			_tableRule = tableRule;
 			return this;
 		}
+		public IDelete<T1> AsType(Type entityType) {
+			if (entityType == typeof(object)) throw new Exception("IDelete.AsType 参数不支持指定为 object");
+			if (entityType == _table.Type) return this;
+			var newtb = _commonUtils.GetTableByEntity(entityType);
+			_table = newtb ?? throw new Exception("IDelete.AsType 参数错误，请传入正确的实体类型");
+			if (_orm.CodeFirst.IsAutoSyncStructure) _orm.CodeFirst.SyncStructure(entityType);
+			return this;
+		}
+
 		public string ToSql() => _whereTimes <= 0 ? null : new StringBuilder().Append("DELETE FROM ").Append(_commonUtils.QuoteSqlName(_tableRule?.Invoke(_table.DbName) ?? _table.DbName)).Append(" WHERE ").Append(_where).ToString();
 	}
 }

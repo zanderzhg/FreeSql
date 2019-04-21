@@ -50,6 +50,11 @@ namespace FreeSql.Tests.Sqlite {
 			Assert.Equal("UPDATE \"tb_topic\" SET \"Title\" = @p_0 WHERE (\"Id\" = 1)", sql);
 		}
 		[Fact]
+		public void UpdateColumns() {
+			var sql = update.SetSource(new Topic { Id = 1, Title = "newtitle" }).UpdateColumns(a => a.Title).ToSql().Replace("\r\n", "");
+			Assert.Equal("UPDATE \"tb_topic\" SET \"Title\" = @p_0 WHERE (\"Id\" = 1)", sql);
+		}
+		[Fact]
 		public void Set() {
 			var sql = update.Where(a => a.Id == 1).Set(a => a.Title, "newtitle").ToSql().Replace("\r\n", "");
 			Assert.Equal("UPDATE \"tb_topic\" SET \"Title\" = @p_0 WHERE (\"Id\" = 1)", sql);
@@ -69,6 +74,9 @@ namespace FreeSql.Tests.Sqlite {
 
 			sql = update.Set(a => a.Id - incrv).Where(a => a.Id == 1).ToSql().Replace("\r\n", "");
 			Assert.Equal("UPDATE \"tb_topic\" SET \"Id\" = \"Id\" - 10 WHERE (\"Id\" = 1)", sql);
+
+			sql = update.Set(a => a.CreateTime.AddYears(1)).Where(a => a.Id == 1).ToSql().Replace("\r\n", "");
+			Assert.Equal("UPDATE \"tb_topic\" SET \"CreateTime\" = datetime(\"CreateTime\",(1)||' years') WHERE (\"Id\" = 1)", sql);
 		}
 		[Fact]
 		public void SetRaw() {

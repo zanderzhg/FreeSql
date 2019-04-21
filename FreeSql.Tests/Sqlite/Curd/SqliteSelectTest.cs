@@ -124,18 +124,51 @@ namespace FreeSql.Tests.Sqlite {
 		}
 		class TestDto {
 			public int id { get; set; }
-			public string name { get; set; }
+			public string name { get; set; } //这是join表的属性
+			public int ParentId { get; set; } //这是join表的属性
+
+			public bool? testBool1 { get; set; }
+			public bool? testBool2 { get; set; }
+		}
+		class TestDtoLeftJoin {
+			[Column(IsPrimary = true)]
+			public int Guid { get; set; }
+			public bool? testBool1 { get; set; }
+			public bool? testBool2 { get; set; }
 		}
 		[Fact]
 		public void ToList() {
+
+			g.sqlite.Delete<TestDtoLeftJoin>().Where("1=1").ExecuteAffrows();
+			var testlist = select.Limit(10).ToList();
+			foreach(var testitem in testlist) {
+				var testdtolj = new TestDtoLeftJoin { Guid = testitem.TypeGuid, testBool1 = true };
+				if (g.sqlite.Select<TestDtoLeftJoin>().Where(a => a.Guid == testitem.TypeGuid).Any() == false)
+					g.sqlite.Insert<TestDtoLeftJoin>(testdtolj).ExecuteAffrows();
+			}
 
 			var testDto1 = select.Limit(10).ToList(a => new TestDto { id = a.Id, name = a.Title });
 			var testDto2 = select.Limit(10).ToList(a => new TestDto());
 			var testDto3 = select.Limit(10).ToList(a => new TestDto { });
 			var testDto4 = select.Limit(10).ToList(a => new TestDto() { });
+
+			var testDto11 = select.LeftJoin<TestDtoLeftJoin>((a,b) => b.Guid == a.TypeGuid).Limit(10).ToList(a => new TestDto { id = a.Id, name = a.Title });
+			var testDto22 = select.LeftJoin<TestDtoLeftJoin>((a, b) => b.Guid == a.TypeGuid).Limit(10).ToList(a => new TestDto());
+			var testDto33 = select.LeftJoin<TestDtoLeftJoin>((a, b) => b.Guid == a.TypeGuid).Limit(10).ToList(a => new TestDto { });
+			var testDto44 = select.LeftJoin<TestDtoLeftJoin>((a, b) => b.Guid == a.TypeGuid).Limit(10).ToList(a => new TestDto() { });
+
+			g.sqlite.Insert<TestGuidIdToList>().AppendData(new TestGuidIdToList()).ExecuteAffrows();
+			var testGuidId5 = g.sqlite.Select<TestGuidIdToList>().ToList();
+			var testGuidId6 = g.sqlite.Select<TestGuidIdToList>().ToList(a => a.id);
+		}
+		class TestGuidIdToList {
+			public Guid id { get; set; }
+			public string title { get; set; } = Guid.NewGuid().ToString();
 		}
 		[Fact]
 		public void ToOne() {
+			var testnotfind = select.Where("1=2").First(a => a.CreateTime);
+			Assert.Equal(default(DateTime), testnotfind);
 		}
 		[Fact]
 		public void ToSql() {
@@ -185,14 +218,20 @@ namespace FreeSql.Tests.Sqlite {
 		}
 		[Fact]
 		public void From() {
-			//�������
-			var query2 = select.From<TestTypeInfo, TestTypeParentInfo>((s, b, c) => s
+			var query2 = select.From<TestTypeInfo>((s, b) => s
+				 .LeftJoin(a => a.TypeGuid == b.Guid)
+				);
+			var sql2 = query2.ToSql().Replace("\r\n", "");
+			Assert.Equal("SELECT a.\"Id\", a.\"Clicks\", a.\"TypeGuid\", b.\"Guid\", b.\"ParentId\", b.\"Name\", a.\"Title\", a.\"CreateTime\" FROM \"tb_topic22\" a LEFT JOIN \"TestTypeInfo\" b ON a.\"TypeGuid\" = b.\"Guid\"", sql2);
+			query2.ToList();
+
+			var query3 = select.From<TestTypeInfo, TestTypeParentInfo>((s, b, c) => s
 				 .LeftJoin(a => a.TypeGuid == b.Guid)
 				 .LeftJoin(a => b.ParentId == c.Id)
 				);
-			var sql = query2.ToSql().Replace("\r\n", "");
-			Assert.Equal("SELECT a.\"Id\", a.\"Clicks\", a.\"TypeGuid\", b.\"Guid\", b.\"ParentId\", b.\"Name\", a.\"Title\", a.\"CreateTime\" FROM \"tb_topic22\" a LEFT JOIN \"TestTypeInfo\" b ON a.\"TypeGuid\" = b.\"Guid\" LEFT JOIN \"TestTypeParentInfo\" c ON b.\"ParentId\" = c.\"Id\"", sql);
-			query2.ToList();
+			var sql3 = query3.ToSql().Replace("\r\n", "");
+			Assert.Equal("SELECT a.\"Id\", a.\"Clicks\", a.\"TypeGuid\", b.\"Guid\", b.\"ParentId\", b.\"Name\", a.\"Title\", a.\"CreateTime\" FROM \"tb_topic22\" a LEFT JOIN \"TestTypeInfo\" b ON a.\"TypeGuid\" = b.\"Guid\" LEFT JOIN \"TestTypeParentInfo\" c ON b.\"ParentId\" = c.\"Id\"", sql3);
+			query3.ToList();
 		}
 		[Fact]
 		public void LeftJoin() {
@@ -552,6 +591,12 @@ namespace FreeSql.Tests.Sqlite {
 			var sql33 = select.OrderBy(a => new Random().NextDouble()).Page(3, 10).ToList();
 		}
 		[Fact]
+		public void Distinct() {
+			var t1 = select.Distinct().ToList(a => a.Title);
+			var t2 = select.Distinct().Limit(10).ToList(a => a.Title);
+		}
+
+		[Fact]
 		public void Sum() {
 		}
 		[Fact]
@@ -569,6 +614,8 @@ namespace FreeSql.Tests.Sqlite {
 
 		[Fact]
 		public void AsTable() {
+
+			var listt = select.AsTable((a, b) => "(select * from tb_topic where clicks > 10)").Page(1, 10).ToList();
 
 			var tenantId = 1;
 			var reposTopic = g.sqlite.GetGuidRepository<Topic>(null, oldname => $"{oldname}_{tenantId}");

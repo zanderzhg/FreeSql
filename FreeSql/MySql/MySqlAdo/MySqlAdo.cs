@@ -14,7 +14,8 @@ namespace FreeSql.MySql {
 		public MySqlAdo() : base(null, null, DataType.MySql) { }
 		public MySqlAdo(CommonUtils util, ICache cache, ILogger log, string masterConnectionString, string[] slaveConnectionStrings) : base(cache, log, DataType.MySql) {
 			base._util = util;
-			MasterPool = new MySqlConnectionPool("主库", masterConnectionString, null, null);
+			if (!string.IsNullOrEmpty(masterConnectionString))
+				MasterPool = new MySqlConnectionPool("主库", masterConnectionString, null, null);
 			if (slaveConnectionStrings != null) {
 				foreach (var slaveConnectionString in slaveConnectionStrings) {
 					var slavePool = new MySqlConnectionPool($"从库{SlavePools.Count + 1}", slaveConnectionString, () => Interlocked.Decrement(ref slaveUnavailables), () => Interlocked.Increment(ref slaveUnavailables));
@@ -34,7 +35,7 @@ namespace FreeSql.MySql {
 			else if (decimal.TryParse(string.Concat(param), out var trydec))
 				return param;
 			else if (param is DateTime || param is DateTime?)
-				return string.Concat("'", ((DateTime)param).ToString("yyyy-MM-dd HH:mm:ss"), "'");
+				return string.Concat("'", ((DateTime)param).ToString("yyyy-MM-dd HH:mm:ss.fff"), "'");
 			else if (param is TimeSpan || param is TimeSpan?)
 				return ((TimeSpan)param).Ticks / 10;
 			else if (param is MygisGeometry)

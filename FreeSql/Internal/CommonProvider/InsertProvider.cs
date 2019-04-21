@@ -22,6 +22,7 @@ namespace FreeSql.Internal.CommonProvider {
 		protected bool _noneParameter;
 		protected DbParameter[] _params;
 		protected DbTransaction _transaction;
+		protected DbConnection _connection;
 
 		public InsertProvider(IFreeSql orm, CommonUtils commonUtils, CommonExpression commonExpression) {
 			_orm = orm;
@@ -29,7 +30,7 @@ namespace FreeSql.Internal.CommonProvider {
 			_commonExpression = commonExpression;
 			_table = _commonUtils.GetTableByEntity(typeof(T1));
 			_noneParameter = _orm.CodeFirst.IsNoneCommandParameter;
-			if (_orm.CodeFirst.IsAutoSyncStructure) _orm.CodeFirst.SyncStructure<T1>();
+			if (_orm.CodeFirst.IsAutoSyncStructure && typeof(T1) != typeof(object)) _orm.CodeFirst.SyncStructure<T1>();
 		}
 
 		protected void ClearData() {
@@ -40,8 +41,15 @@ namespace FreeSql.Internal.CommonProvider {
 
 		public IInsert<T1> WithTransaction(DbTransaction transaction) {
 			_transaction = transaction;
+			_connection = _transaction?.Connection;
 			return this;
 		}
+		public IInsert<T1> WithConnection(DbConnection connection) {
+			if (_transaction?.Connection != connection) _transaction = null;
+			_connection = connection;
+			return this;
+		}
+
 		public IInsert<T1> NoneParameter() {
 			_noneParameter = true;
 			return this;
@@ -315,8 +323,8 @@ namespace FreeSql.Internal.CommonProvider {
 		}
 		#endregion
 
-		internal int RawExecuteAffrows() => _orm.Ado.ExecuteNonQuery(_transaction, CommandType.Text, ToSql(), _params);
-		internal Task<int> RawExecuteAffrowsAsync() => _orm.Ado.ExecuteNonQueryAsync(_transaction, CommandType.Text, ToSql(), _params);
+		internal int RawExecuteAffrows() => _orm.Ado.ExecuteNonQuery(_connection, _transaction, CommandType.Text, ToSql(), _params);
+		internal Task<int> RawExecuteAffrowsAsync() => _orm.Ado.ExecuteNonQueryAsync(_connection, _transaction, CommandType.Text, ToSql(), _params);
 		internal abstract long RawExecuteIdentity();
 		internal abstract Task<long> RawExecuteIdentityAsync();
 		internal abstract List<T1> RawExecuteInserted();
@@ -348,6 +356,15 @@ namespace FreeSql.Internal.CommonProvider {
 			_tableRule = tableRule;
 			return this;
 		}
+		public IInsert<T1> AsType(Type entityType) {
+			if (entityType == typeof(object)) throw new Exception("IInsert.AsType 参数不支持指定为 object");
+			if (entityType == _table.Type) return this;
+			var newtb = _commonUtils.GetTableByEntity(entityType);
+			_table = newtb ?? throw new Exception("IInsert.AsType 参数错误，请传入正确的实体类型");
+			if (_orm.CodeFirst.IsAutoSyncStructure) _orm.CodeFirst.SyncStructure(entityType);
+			return this;
+		}
+
 		public virtual string ToSql() {
 			if (_source == null || _source.Any() == false) return null;
 			var sb = new StringBuilder();

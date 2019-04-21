@@ -30,6 +30,25 @@ namespace FreeSql {
 		/// <returns></returns>
 		List<TReturn> ToList<TReturn>(Expression<Func<T1, TReturn>> select);
 		Task<List<TReturn>> ToListAsync<TReturn>(Expression<Func<T1, TReturn>> select);
+
+		/// <summary>
+		/// 执行SQL查询，返回指定字段的记录的第一条记录，记录不存在时返回 TReturn 默认值
+		/// </summary>
+		/// <typeparam name="TReturn">返回类型</typeparam>
+		/// <param name="select">选择列</param>
+		/// <returns></returns>
+		TReturn ToOne<TReturn>(Expression<Func<T1, TReturn>> select);
+		Task<TReturn> ToOneAsync<TReturn>(Expression<Func<T1, TReturn>> select);
+
+		/// <summary>
+		/// 执行SQL查询，返回指定字段的记录的第一条记录，记录不存在时返回 TReturn 默认值
+		/// </summary>
+		/// <typeparam name="TReturn">返回类型</typeparam>
+		/// <param name="select">选择列</param>
+		/// <returns></returns>
+		TReturn First<TReturn>(Expression<Func<T1, TReturn>> select);
+		Task<TReturn> FirstAsync<TReturn>(Expression<Func<T1, TReturn>> select);
+
 		/// <summary>
 		/// 返回即将执行的SQL语句
 		/// </summary>
@@ -87,6 +106,13 @@ namespace FreeSql {
 		/// <returns></returns>
 		ISelect<T1> As(string alias = "a");
 
+		/// <summary>
+		/// 多表查询
+		/// </summary>
+		/// <typeparam name="T2"></typeparam>
+		/// <param name="exp"></param>
+		/// <returns></returns>
+		ISelect<T1, T2> From<T2>(Expression<Func<ISelectFromExpression<T1>, T2, ISelectFromExpression<T1>>> exp) where T2 : class;
 		/// <summary>
 		/// 多表查询
 		/// </summary>
@@ -233,6 +259,12 @@ namespace FreeSql {
 		/// <param name="exp">lambda表达式</param>
 		/// <returns></returns>
 		ISelect<T1> Where<T2, T3, T4, T5>(Expression<Func<T1, T2, T3, T4, T5, bool>> exp) where T2 : class where T3 : class where T4 : class where T5 : class;
+		/// <summary>
+		/// 传入动态对象如：主键值 | new[]{主键值1,主键值2} | TEntity1 | new[]{TEntity1,TEntity2} | new{id=1}
+		/// </summary>
+		/// <param name="dywhere">主键值、主键值集合、实体、实体集合、匿名对象、匿名对象集合</param>
+		/// <returns></returns>
+		ISelect<T1> WhereDynamic(object dywhere);
 
 		/// <summary>
 		/// 按选择的列分组，GroupBy(a => a.Name) | GroupBy(a => new{a.Name,a.Time})

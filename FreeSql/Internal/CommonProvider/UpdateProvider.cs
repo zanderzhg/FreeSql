@@ -26,6 +26,7 @@ namespace FreeSql.Internal.CommonProvider {
 		protected List<DbParameter> _paramsSource = new List<DbParameter>();
 		protected bool _noneParameter;
 		protected DbTransaction _transaction;
+		protected DbConnection _connection;
 
 		public UpdateProvider(IFreeSql orm, CommonUtils commonUtils, CommonExpression commonExpression, object dywhere) {
 			_orm = orm;
@@ -34,7 +35,7 @@ namespace FreeSql.Internal.CommonProvider {
 			_table = _commonUtils.GetTableByEntity(typeof(T1));
 			_noneParameter = _orm.CodeFirst.IsNoneCommandParameter;
 			this.Where(_commonUtils.WhereObject(_table, "", dywhere));
-			if (_orm.CodeFirst.IsAutoSyncStructure) _orm.CodeFirst.SyncStructure<T1>();
+			if (_orm.CodeFirst.IsAutoSyncStructure && typeof(T1) != typeof(object)) _orm.CodeFirst.SyncStructure<T1>();
 		}
 
 		protected void ClearData() {
@@ -49,8 +50,15 @@ namespace FreeSql.Internal.CommonProvider {
 
 		public IUpdate<T1> WithTransaction(DbTransaction transaction) {
 			_transaction = transaction;
+			_connection = _transaction?.Connection;
 			return this;
 		}
+		public IUpdate<T1> WithConnection(DbConnection connection) {
+			if (_transaction?.Connection != connection) _transaction = null;
+			_connection = connection;
+			return this;
+		}
+
 		public IUpdate<T1> NoneParameter() {
 			_noneParameter = true;
 			return this;
@@ -61,7 +69,7 @@ namespace FreeSql.Internal.CommonProvider {
 				if (affrows != _source.Count)
 					throw new Exception($"记录可能不存在，或者【行级乐观锁】版本过旧，更新数量{_source.Count}，影响的行数{affrows}。");
 				foreach (var d in _source)
-					_orm.SetEntityIncrByWithPropertyName(d, _table.VersionColumn.CsName, 1);
+					_orm.SetEntityIncrByWithPropertyName(_table.Type, d, _table.VersionColumn.CsName, 1);
 			}
 		}
 
@@ -231,14 +239,14 @@ namespace FreeSql.Internal.CommonProvider {
 		internal int RawExecuteAffrows() {
 			var sql = this.ToSql();
 			if (string.IsNullOrEmpty(sql)) return 0;
-			var affrows = _orm.Ado.ExecuteNonQuery(_transaction, CommandType.Text, sql, _params.Concat(_paramsSource).ToArray());
+			var affrows = _orm.Ado.ExecuteNonQuery(_connection, _transaction, CommandType.Text, sql, _params.Concat(_paramsSource).ToArray());
 			ValidateVersionAndThrow(affrows);
 			return affrows;
 		}
 		async internal Task<int> RawExecuteAffrowsAsync() {
 			var sql = this.ToSql();
 			if (string.IsNullOrEmpty(sql)) return 0;
-			var affrows = await _orm.Ado.ExecuteNonQueryAsync(_transaction, CommandType.Text, sql, _params.Concat(_paramsSource).ToArray());
+			var affrows = await _orm.Ado.ExecuteNonQueryAsync(_connection, _transaction, CommandType.Text, sql, _params.Concat(_paramsSource).ToArray());
 			ValidateVersionAndThrow(affrows);
 			return affrows;
 		}
@@ -256,9 +264,26 @@ namespace FreeSql.Internal.CommonProvider {
 			foreach (var col in cols) _ignore.Add(col, true);
 			return this;
 		}
+		public IUpdate<T1> UpdateColumns(Expression<Func<T1, object>> columns) {
+			var cols = _commonExpression.ExpressionSelectColumns_MemberAccess_New_NewArrayInit(null, columns?.Body, false, null).ToDictionary(a => a, a => true);
+			_ignore.Clear();
+			foreach (var col in _table.Columns.Values)
+				if (cols.ContainsKey(col.Attribute.Name) == false)
+					_ignore.Add(col.Attribute.Name, true);
+			return this;
+		}
+
 		public IUpdate<T1> IgnoreColumns(string[] columns) {
 			_ignore.Clear();
 			foreach (var col in columns) _ignore.Add(col, true);
+			return this;
+		}
+		public IUpdate<T1> UpdateColumns(string[] columns) {
+			var cols = columns.ToDictionary(a => a);
+			_ignore.Clear();
+			foreach (var col in _table.Columns.Values)
+				if (cols.ContainsKey(col.Attribute.Name) == false)
+					_ignore.Add(col.Attribute.Name, true);
 			return this;
 		}
 
@@ -322,6 +347,7 @@ namespace FreeSql.Internal.CommonProvider {
 		public IUpdate<T1> Where(T1 item) => this.Where(new[] { item });
 		public IUpdate<T1> Where(IEnumerable<T1> items) => this.Where(_commonUtils.WhereItems(_table, "", items));
 		public IUpdate<T1> WhereExists<TEntity2>(ISelect<TEntity2> select, bool notExists = false) where TEntity2 : class => this.Where($"{(notExists ? "NOT " : "")}EXISTS({select.ToSql("1")})");
+		public IUpdate<T1> WhereDynamic(object dywhere) => this.Where(_commonUtils.WhereObject(_table, "", dywhere));
 
 		protected string WhereCaseSource(string CsName, Func<string, string> thenValue) {
 			if (_source.Any() == false) return null;
@@ -376,6 +402,15 @@ namespace FreeSql.Internal.CommonProvider {
 			_tableRule = tableRule;
 			return this;
 		}
+		public IUpdate<T1> AsType(Type entityType) {
+			if (entityType == typeof(object)) throw new Exception("IUpdate.AsType 参数不支持指定为 object");
+			if (entityType == _table.Type) return this;
+			var newtb = _commonUtils.GetTableByEntity(entityType);
+			_table = newtb ?? throw new Exception("IUpdate.AsType 参数错误，请传入正确的实体类型");
+			if (_orm.CodeFirst.IsAutoSyncStructure) _orm.CodeFirst.SyncStructure(entityType);
+			return this;
+		}
+
 		public string ToSql() {
 			if (_where.Length == 0 && _source.Any() == false) return null;
 

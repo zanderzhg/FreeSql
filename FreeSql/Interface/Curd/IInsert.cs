@@ -13,6 +13,12 @@ namespace FreeSql {
 		/// <param name="transaction"></param>
 		/// <returns></returns>
 		IInsert<T1> WithTransaction(DbTransaction transaction);
+		/// <summary>
+		/// 指定事务对象
+		/// </summary>
+		/// <param name="transaction"></param>
+		/// <returns></returns>
+		IInsert<T1> WithConnection(DbConnection connection);
 
 		/// <summary>
 		/// 追加准备插入的实体
@@ -58,6 +64,12 @@ namespace FreeSql {
 		/// <param name="dataTable"></param>
 		/// <returns></returns>
 		IInsert<T1> AsTable(Func<string, string> tableRule);
+		/// <summary>
+		/// 动态Type，在使用 Insert&lt;object&gt; 后使用本方法，指定实体类型
+		/// </summary>
+		/// <param name="entityType"></param>
+		/// <returns></returns>
+		IInsert<T1> AsType(Type entityType);
 		/// <summary>
 		/// 返回即将执行的SQL语句
 		/// </summary>

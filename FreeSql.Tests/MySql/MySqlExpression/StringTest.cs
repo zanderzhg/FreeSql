@@ -32,6 +32,18 @@ namespace FreeSql.Tests.MySqlExpression {
 
 			public List<TestTypeInfo> Types { get; set; }
 		}
+		class TestEqualsGuid {
+			public Guid id { get; set; }
+			public bool IsDeleted { get; set; }
+		}
+
+		[Fact]
+		public void Equals__() {
+			var list = new List<object>();
+			list.Add(select.Where(a => a.Title.Equals("aaa")).ToList());
+			list.Add(g.sqlite.Select<TestEqualsGuid>().Where(a => a.id.Equals(Guid.Empty)).ToList());
+			list.Add(g.sqlite.Select<TestEqualsGuid>().Where(a => a.IsDeleted.Equals(false)).ToList());
+		}
 
 		[Fact]
 		public void Empty() {

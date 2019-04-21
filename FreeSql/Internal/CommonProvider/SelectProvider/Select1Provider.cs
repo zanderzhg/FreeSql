@@ -70,6 +70,7 @@ namespace FreeSql.Internal.CommonProvider {
 			return this.InternalAvgAsync<TMember>(column?.Body);
 		}
 
+		public abstract ISelect<T1, T2> From<T2>(Expression<Func<ISelectFromExpression<T1>, T2, ISelectFromExpression<T1>>> exp) where T2 : class;// { this.InternalFrom(exp?.Body); var ret = new Select3Provider<T1, T2, T3>(_orm, _commonUtils, _commonExpression, null); Select0Provider<ISelect<T1>, T1>.CopyData(this, ret, exp?.Parameters); return ret; }
 		public abstract ISelect<T1, T2, T3> From<T2, T3>(Expression<Func<ISelectFromExpression<T1>, T2, T3, ISelectFromExpression<T1>>> exp) where T2 : class where T3 : class;// { this.InternalFrom(exp?.Body); var ret = new Select3Provider<T1, T2, T3>(_orm, _commonUtils, _commonExpression, null); Select0Provider<ISelect<T1>, T1>.CopyData(this, ret, exp?.Parameters); return ret; }
 
 		public abstract ISelect<T1, T2, T3, T4> From<T2, T3, T4>(Expression<Func<ISelectFromExpression<T1>, T2, T3, T4, ISelectFromExpression<T1>>> exp) where T2 : class where T3 : class where T4 : class;// { this.InternalFrom(exp?.Body); var ret = new Select4Provider<T1, T2, T3, T4>(_orm, _commonUtils, _commonExpression, null); Select0Provider<ISelect<T1>, T1>.CopyData(this, ret, exp?.Parameters); return ret; }
@@ -217,10 +218,10 @@ namespace FreeSql.Internal.CommonProvider {
 			_tables[0].Parameter = exp.Parameters[0];
 			return this.InternalWhere(exp?.Body);
 		}
+		public ISelect<T1> WhereDynamic(object dywhere) => this.Where(_commonUtils.WhereObject(_tables.First().Table, $"{_tables.First().Alias}.", dywhere));
 
 		public ISelect<T1> WhereIf(bool condition, Expression<Func<T1, bool>> exp) {
-			if (condition == false) return this;
-			if (exp == null) return this;
+			if (condition == false || exp == null) return this;
 			_tables[0].Parameter = exp.Parameters[0];
 			return this.InternalWhere(exp?.Body);
 		}
@@ -228,5 +229,13 @@ namespace FreeSql.Internal.CommonProvider {
 		public bool Any(Expression<Func<T1, bool>> exp) => this.Where(exp).Any();
 
 		public Task<bool> AnyAsync(Expression<Func<T1, bool>> exp) => this.Where(exp).AnyAsync();
+
+		public TReturn ToOne<TReturn>(Expression<Func<T1, TReturn>> select) => this.Limit(1).ToList(select).FirstOrDefault();
+
+		async public Task<TReturn> ToOneAsync<TReturn>(Expression<Func<T1, TReturn>> select) => (await this.Limit(1).ToListAsync(select)).FirstOrDefault();
+
+		public TReturn First<TReturn>(Expression<Func<T1, TReturn>> select) => this.ToOne(select);
+
+		public Task<TReturn> FirstAsync<TReturn>(Expression<Func<T1, TReturn>> select) => this.ToOneAsync(select);
 	}
 }
